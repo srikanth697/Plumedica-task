@@ -9,8 +9,17 @@ const {
     loginDoctor,
 } = require("../controllers/authController");
 
-router.post("/register", upload.none(), registerDoctor);
+const handleUpload = (req, res, next) => {
+    upload.none()(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ message: err.message });
+        }
+        next();
+    });
+};
 
-router.post("/login", upload.none(), loginDoctor);
+router.post("/register", handleUpload, registerDoctor);
+
+router.post("/login", handleUpload, loginDoctor);
 
 module.exports = router;

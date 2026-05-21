@@ -73,8 +73,17 @@ exports.registerDoctor = async (req, res) => {
 
     } catch (error) {
 
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern || {})[0] || "field";
+            return res.status(400).json({
+                message: `${field} already exists`,
+            });
+        }
+
+        console.error("Register error:", error);
+
         res.status(500).json({
-            message: error.message,
+            message: error.message || "Registration failed",
         });
 
     }

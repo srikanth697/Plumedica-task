@@ -32,6 +32,19 @@ app.use((req, res) => {
     res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
+app.use((err, req, res, next) => {
+    console.error("Unhandled error:", err);
+
+    if (err.code === 11000) {
+        const field = Object.keys(err.keyPattern || {})[0] || "field";
+        return res.status(400).json({ message: `${field} already exists` });
+    }
+
+    res.status(err.status || 500).json({
+        message: err.message || "Internal server error",
+    });
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

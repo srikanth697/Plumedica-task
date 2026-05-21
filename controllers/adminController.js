@@ -42,12 +42,15 @@ exports.approveDoctor = async (req, res) => {
 
         await doctor.save();
 
+        let emailSent = false;
+
         try {
             await sendEmail(
                 doctor.email,
-                "Doctor Approved",
-                `Your account approved successfully. Doctor ID: ${doctorId}`
+                "Plumedica - Doctor Account Approved",
+                `Dear ${doctor.fullName},\n\nYour doctor registration has been approved.\n\nDoctor ID: ${doctorId}\n\nYou can now log in to the Plumedica app.\n\nRegards,\nPlumedica Team`
             );
+            emailSent = true;
         } catch (emailError) {
             console.error("Approval email failed:", emailError.message);
         }
@@ -55,6 +58,9 @@ exports.approveDoctor = async (req, res) => {
         res.json({
             success: true,
             message: "Doctor approved successfully",
+            emailSent,
+            doctorEmail: doctor.email,
+            doctorId,
         });
 
     } catch (error) {
@@ -88,12 +94,15 @@ exports.rejectDoctor = async (req, res) => {
 
         await doctor.save();
 
+        let emailSent = false;
+
         try {
             await sendEmail(
                 doctor.email,
-                "Application Rejected",
-                `Reason: ${rejectionReason}`
+                "Plumedica - Application Rejected",
+                `Dear ${doctor.fullName},\n\nYour registration was rejected.\n\nReason: ${rejectionReason}\n\nRegards,\nPlumedica Team`
             );
+            emailSent = true;
         } catch (emailError) {
             console.error("Rejection email failed:", emailError.message);
         }
@@ -101,6 +110,8 @@ exports.rejectDoctor = async (req, res) => {
         res.json({
             success: true,
             message: "Doctor rejected successfully",
+            emailSent,
+            doctorEmail: doctor.email,
         });
 
     } catch (error) {
