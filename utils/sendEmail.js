@@ -1,174 +1,64 @@
-const nodemailer = require("nodemailer");
+const brevo = require("@getbrevo/brevo");
 const { env } = require("../config/env");
 const { approvalTemplate, rejectionTemplate } = require("./emailTemplates");
 
-const API_EMAIL_TIMEOUT_MS = 20000;
-const SMTP_TIMEOUT_MS = 45000;
-const MAX_RETRIES = 2;
-
-let transporter = null;
-let verified = false;
+let apiInstance = null;
 
 const ok = (extra = {}) => ({ success: true, error: null, ...extra });
 const fail = (error, extra = {}) => ({ success: false, error, ...extra });
 
-const withTimeout = (promise, ms, label) =>
-    Promise.race([
-        promise,
-        new Promise((_, reject) => {
-            setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-        }),
-    ]);
-
-const createTransporter = () =>
-    nodemailer.createTransport({
-        host: env.emailHost,
-        port: env.emailPort,
-        secure: false,
-        requireTLS: true,
-        auth: {
-            user: env.emailUser,
-            pass: env.emailPass,
-        },
-        pool: true,
-        maxConnections: 2,
-        maxMessages: 50,
-        connectionTimeout: SMTP_TIMEOUT_MS,
-        greetingTimeout: SMTP_TIMEOUT_MS,
-        socketTimeout: SMTP_TIMEOUT_MS,
-        family: 4,
-        tls: {
-            minVersion: "TLSv1.2",
-            rejectUnauthorized: true,
-        },
-    });
-
-const safeCloseTransporter = () => {
-    if (!transporter) {
-        return;
+const getBrevoApi = () => {
+    if (!env.brevoApiKey) {
+        throw new Error("BREVO_API_KEY is not configured");
     }
 
-    try {
-        const closeResult = transporter.close();
-
-        if (closeResult && typeof closeResult.then === "function") {
-            closeResult.catch((err) => {
-                console.warn("[EMAIL] Transporter close warning:", err.message);
-            });
-        }
-    } catch (err) {
-        console.warn("[EMAIL] Transporter close warning:", err.message);
-    }
-};
-
-const resetTransporter = () => {
-    safeCloseTransporter();
-    transporter = null;
-    verified = false;
-};
-
-const getTransporter = () => {
-    if (!env.emailUser || !env.emailPass) {
-        throw new Error("EMAIL_USER and EMAIL_PASS are not configured");
+    if (!apiInstance) {
+        apiInstance = new brevo.TransactionalEmailsApi();
+        apiInstance.setApiKey(
+            brevo.TransactionalEmailsApiApiKeys.apiKey,
+            env.brevoApiKey
+        );
+        console.log("[EMAIL] Brevo REST API client ready");
     }
 
-    if (!transporter) {
-        transporter = createTransporter();
-        console.log(`[EMAIL] Brevo SMTP pool ready (${env.emailHost}:${env.emailPort})`);
-    }
-
-    return transporter;
+    return apiInstance;
 };
 
-const verifyConnection = async () => {
-    const transport = getTransporter();
+const sendViaBrevoApi = async ({ to, toName, subject, html, text }) => {
+    const api = getBrevoApi();
 
-    console.log("[EMAIL] Verifying Brevo SMTP connection...");
+    const email = new brevo.SendSmtpEmail();
+    email.subject = subject;
+    email.htmlContent = html;
+    email.textContent = text;
+    email.sender = {
+        name: env.brevoSender.name,
+        email: env.brevoSender.email,
+    };
+    email.to = [{ email: to, name: toName || to }];
 
-    await withTimeout(transport.verify(), SMTP_TIMEOUT_MS, "Brevo SMTP verify");
+    console.log(`[EMAIL] Brevo REST → ${to} | ${subject}`);
 
-    verified = true;
-    console.log("[EMAIL] Brevo SMTP verified successfully");
-};
+    const response = await api.sendTransacEmail(email);
 
-const initEmailService = async () => {
-    if (!env.emailUser || !env.emailPass) {
-        console.error("[EMAIL] Skipping verify — Brevo credentials missing");
-        return false;
-    }
+    const messageId = response?.body?.messageId || response?.messageId || "sent";
 
-    try {
-        await verifyConnection();
-        return true;
-    } catch (err) {
-        console.error("[EMAIL] Brevo verify failed:", err.message);
-        resetTransporter();
-        return false;
-    }
-};
+    console.log("[EMAIL] Brevo REST success | messageId:", messageId);
 
-const sendMailOnce = async ({ to, subject, html, text }) => {
-    const transport = getTransporter();
-
-    console.log(`[EMAIL] Sending via Brevo to: ${to} | subject: ${subject}`);
-
-    const info = await transport.sendMail({
-        from: env.emailFrom,
-        to,
-        subject,
-        html,
-        text,
-    });
-
-    console.log("[EMAIL] Brevo sent successfully | messageId:", info.messageId);
-
-    return { messageId: info.messageId, provider: "brevo" };
-};
-
-const sendMailWithRetry = async (payload, timeoutMs = SMTP_TIMEOUT_MS) => {
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            return await withTimeout(sendMailOnce(payload), timeoutMs, "Brevo sendMail");
-        } catch (err) {
-            lastError = err;
-            console.error(`[EMAIL] Attempt ${attempt}/${MAX_RETRIES} failed:`, err.message);
-            resetTransporter();
-
-            if (attempt < MAX_RETRIES) {
-                await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
-            }
-        }
-    }
-
-    throw lastError;
-};
-
-const runBackgroundSend = (payload, label) => {
-    setImmediate(async () => {
-        try {
-            const result = await sendMailWithRetry(payload, SMTP_TIMEOUT_MS);
-            console.log(`[EMAIL] Background ${label} success:`, result.messageId);
-        } catch (err) {
-            console.error(`[EMAIL] Background ${label} failed:`, err.message);
-        }
-    });
+    return { messageId, provider: "brevo-rest" };
 };
 
 const sendEmail = async (mailPayload, options = {}) => {
-    const timeoutMs = options.timeoutMs || API_EMAIL_TIMEOUT_MS;
-
     try {
-        if (!env.emailUser || !env.emailPass) {
-            console.error("[EMAIL] Brevo EMAIL_USER or EMAIL_PASS missing");
-            return fail("Brevo SMTP credentials not configured on server", {
+        if (!env.brevoApiKey) {
+            console.error("[EMAIL] BREVO_API_KEY missing");
+            return fail("BREVO_API_KEY is not configured on server", {
                 emailSent: false,
                 messageId: null,
             });
         }
 
-        const result = await sendMailWithRetry(mailPayload, timeoutMs);
+        const result = await sendViaBrevoApi(mailPayload);
 
         return ok({
             emailSent: true,
@@ -176,13 +66,26 @@ const sendEmail = async (mailPayload, options = {}) => {
             provider: result.provider,
         });
     } catch (err) {
-        console.error("[EMAIL] Brevo send failed:", err.message);
+        const message =
+            err?.response?.body?.message ||
+            err?.body?.message ||
+            err?.message ||
+            "Brevo API request failed";
+
+        console.error("[EMAIL] Brevo REST failed:", message);
 
         if (options.backgroundRetry) {
-            runBackgroundSend(mailPayload, options.backgroundRetry);
+            setImmediate(async () => {
+                try {
+                    const retry = await sendViaBrevoApi(mailPayload);
+                    console.log(`[EMAIL] Background ${options.backgroundRetry} ok:`, retry.messageId);
+                } catch (bgErr) {
+                    console.error(`[EMAIL] Background ${options.backgroundRetry} failed:`, bgErr.message);
+                }
+            });
         }
 
-        return fail(err.message, {
+        return fail(message, {
             emailSent: false,
             messageId: null,
             emailQueued: Boolean(options.backgroundRetry),
@@ -190,27 +93,34 @@ const sendEmail = async (mailPayload, options = {}) => {
     }
 };
 
-sendEmail.init = initEmailService;
+sendEmail.init = async () => {
+    if (!env.brevoApiKey) {
+        return false;
+    }
+
+    getBrevoApi();
+    console.log("[EMAIL] Brevo REST API initialized (no SMTP)");
+    return true;
+};
 
 sendEmail.approval = async (to, fullName, doctorId) => {
-    console.log(`[APPROVE EMAIL] Preparing for ${to} | doctorId: ${doctorId}`);
+    console.log(`[APPROVE EMAIL] ${to} | doctorId: ${doctorId}`);
 
     const template = approvalTemplate(fullName, doctorId);
-    const result = await sendEmail(
-        { to, ...template },
-        { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "approval" }
-    );
+    const result = await sendEmail({
+        to,
+        toName: fullName,
+        ...template,
+    });
 
-    if (result.success) {
-        console.log(`[APPROVE EMAIL] Success for ${to}`);
-    } else {
-        console.error(`[APPROVE EMAIL] Failed for ${to}:`, result.error);
+    if (!result.success) {
+        console.error(`[APPROVE EMAIL] Failed:`, result.error);
     }
 
     return {
         success: result.success,
         error: result.error,
-        emailSent: result.emailSent ?? result.success,
+        emailSent: result.success,
         emailError: result.error,
         messageId: result.messageId ?? null,
         emailQueued: result.emailQueued ?? false,
@@ -218,31 +128,30 @@ sendEmail.approval = async (to, fullName, doctorId) => {
 };
 
 sendEmail.rejection = async (to, fullName, rejectionReason) => {
-    console.log(`[REJECT EMAIL] Preparing for ${to}`);
+    console.log(`[REJECT EMAIL] ${to}`);
 
     const template = rejectionTemplate(fullName, rejectionReason);
-    const result = await sendEmail(
-        { to, ...template },
-        { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "rejection" }
-    );
+    const result = await sendEmail({
+        to,
+        toName: fullName,
+        ...template,
+    });
 
-    if (result.success) {
-        console.log(`[REJECT EMAIL] Success for ${to}`);
-    } else {
-        console.error(`[REJECT EMAIL] Failed for ${to}:`, result.error);
+    if (!result.success) {
+        console.error(`[REJECT EMAIL] Failed:`, result.error);
     }
 
     return {
         success: result.success,
         error: result.error,
-        emailSent: result.emailSent ?? result.success,
+        emailSent: result.success,
         emailError: result.error,
         messageId: result.messageId ?? null,
         emailQueued: result.emailQueued ?? false,
     };
 };
 
-sendEmail.isConfigured = () => Boolean(env.emailUser && env.emailPass);
-sendEmail.isVerified = () => verified;
+sendEmail.isConfigured = () => Boolean(env.brevoApiKey);
+sendEmail.isVerified = () => Boolean(env.brevoApiKey);
 
 module.exports = sendEmail;

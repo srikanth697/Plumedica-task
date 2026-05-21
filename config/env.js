@@ -13,18 +13,28 @@ const get = (key) => {
     return String(value).trim();
 };
 
+const parseSender = () => {
+    const email = get("BREVO_SENDER_EMAIL") || "srikanthparimisetty93@gmail.com";
+    const name = get("BREVO_SENDER_NAME") || "Plumedica";
+
+    return { name, email };
+};
+
 const env = {
     port: get("PORT") || "5000",
     mongoUri: get("MONGO_URI"),
     jwtSecret: get("JWT_SECRET"),
-    emailHost: get("EMAIL_HOST") || "smtp-relay.brevo.com",
-    emailPort: Number(get("EMAIL_PORT") || "587"),
-    emailUser: get("EMAIL_USER"),
-    emailPass: get("EMAIL_PASS"),
-    emailFrom: get("EMAIL_FROM") || "Plumedica <noreply@plumedica.com>",
+    brevoApiKey: get("BREVO_API_KEY"),
+    brevoSender: parseSender(),
     adminEmail: get("ADMIN_EMAIL") || "admin@plumedica.com",
     adminPassword: get("ADMIN_PASSWORD") || "Plumedica@admin123",
     nodeEnv: get("NODE_ENV") || "development",
+};
+
+const maskKey = (key) => {
+    if (!key) return "MISSING";
+    if (key.length <= 10) return "***";
+    return `${key.slice(0, 8)}...${key.slice(-4)}`;
 };
 
 const logEnvStatus = () => {
@@ -32,16 +42,13 @@ const logEnvStatus = () => {
     console.log(`NODE_ENV: ${env.nodeEnv}`);
     console.log(`MONGO_URI: ${env.mongoUri ? "loaded" : "MISSING"}`);
     console.log(`JWT_SECRET: ${env.jwtSecret ? "loaded" : "MISSING"}`);
-    console.log(`EMAIL_HOST: ${env.emailHost}`);
-    console.log(`EMAIL_PORT: ${env.emailPort}`);
-    console.log(`EMAIL_USER: ${env.emailUser || "MISSING"}`);
-    console.log(`EMAIL_PASS: ${env.emailPass ? "loaded" : "MISSING"}`);
-    console.log(`EMAIL_FROM: ${env.emailFrom}`);
+    console.log(`BREVO_API_KEY: ${maskKey(env.brevoApiKey)}`);
+    console.log(`BREVO_SENDER: ${env.brevoSender.name} <${env.brevoSender.email}>`);
     console.log("================================");
 
-    if (!env.emailUser || !env.emailPass) {
+    if (!env.brevoApiKey) {
         console.error(
-            "[EMAIL] Set EMAIL_USER and EMAIL_PASS (Brevo SMTP) in Render Environment, then redeploy."
+            "[EMAIL] BREVO_API_KEY missing. Add it in Render Environment, then redeploy."
         );
     }
 };

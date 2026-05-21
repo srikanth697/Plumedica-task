@@ -24,12 +24,8 @@ mongoose
         console.log("MongoDB connected");
         await seedAdmin();
         console.log("Admin ready");
-        try {
-            const emailReady = await sendEmail.init();
-            console.log(emailReady ? "[EMAIL] Service ready" : "[EMAIL] Service not verified");
-        } catch (emailErr) {
-            console.error("[EMAIL] Init error:", emailErr.message);
-        }
+        const emailReady = await sendEmail.init();
+        console.log(emailReady ? "[EMAIL] Brevo REST ready" : "[EMAIL] Brevo API key missing");
     })
     .catch((err) => console.error("MongoDB error:", err.message));
 
@@ -43,7 +39,7 @@ app.get("/health", (_, res) => {
         message: "Plumedica API is healthy",
         timestamp: new Date().toISOString(),
         emailConfigured: sendEmail.isConfigured(),
-        emailVerified: sendEmail.isVerified(),
+        emailProvider: "brevo-rest",
         environment: env.nodeEnv,
     });
 });
