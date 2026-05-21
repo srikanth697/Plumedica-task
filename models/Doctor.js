@@ -13,6 +13,8 @@ const doctorSchema = new mongoose.Schema(
         licenseNumber: { type: String, required: true, unique: true, trim: true },
         availability: { type: String, trim: true },
         doctorId: { type: String, trim: true },
+        profilePhoto: { type: String, trim: true },
+        documents: [{ type: String, trim: true }],
         rejectionReason: { type: String, trim: true },
         status: {
             type: String,

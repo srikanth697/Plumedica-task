@@ -4,6 +4,7 @@ const sendEmail = require("./utils/sendEmail");
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -17,6 +18,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 mongoose
     .connect(process.env.MONGO_URI)
@@ -41,6 +43,13 @@ app.get("/health", (_, res) => {
         emailConfigured: sendEmail.isConfigured(),
         emailProvider: "brevo-rest",
         environment: env.nodeEnv,
+        authRoutes: [
+            "POST /api/auth/register",
+            "POST /api/auth/login",
+            "GET  /api/auth/check-status?email=",
+            "POST /api/auth/check-status",
+            "GET  /api/auth/profile",
+        ],
     });
 });
 

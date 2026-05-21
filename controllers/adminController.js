@@ -2,6 +2,7 @@ const Doctor = require("../models/Doctor");
 const sendEmail = require("../utils/sendEmail");
 const { parseMongoId } = require("../utils/parseId");
 const { normalizeRejectBody, normalizeDeleteBody } = require("../utils/normalizeBody");
+const { fetchDoctorList } = require("../utils/doctorList");
 
 const getDoctorOrRespond = async (id, res) => {
     const mongoId = parseMongoId(id);
@@ -40,18 +41,24 @@ const buildEmailResponse = (actionLabel, emailResult, extra = {}) => {
     };
 };
 
-exports.getDoctors = async (req, res) => {
+const respondDoctorList = async (req, res, fixedStatus = null) => {
     try {
-        const doctors = await Doctor.find()
-            .select("-password")
-            .sort({ createdAt: -1 });
+        const result = await fetchDoctorList(req.query, fixedStatus);
 
-        return res.status(200).json({ success: true, count: doctors.length, doctors });
+        return res.status(200).json({
+            success: true,
+            ...result,
+        });
     } catch (error) {
         console.error("Get doctors error:", error);
         return res.status(500).json({ success: false, message: "Failed to fetch doctors" });
     }
 };
+
+exports.getDoctors = (req, res) => respondDoctorList(req, res);
+exports.getPendingDoctors = (req, res) => respondDoctorList(req, res, "PENDING");
+exports.getApprovedDoctors = (req, res) => respondDoctorList(req, res, "APPROVED");
+exports.getRejectedDoctors = (req, res) => respondDoctorList(req, res, "REJECTED");
 
 exports.approveDoctor = async (req, res) => {
     try {
