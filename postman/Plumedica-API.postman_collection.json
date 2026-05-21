@@ -1,173 +1,40 @@
 {
   "info": {
-    "name": "Plumedica API",
-    "description": "Import this collection in Postman. Set `baseUrl` in collection variables.",
+    "name": "Plumedica API v2",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "https://plumedica-task.onrender.com" },
-    { "key": "doctorMongoId", "value": "" },
-    { "key": "doctorEmail", "value": "srikanthparimisetty93@gmail.com" },
-    { "key": "doctorPassword", "value": "aarav@123" },
-    { "key": "authToken", "value": "" },
     { "key": "adminToken", "value": "" },
-    { "key": "adminEmail", "value": "admin@plumedica.com" },
-    { "key": "adminPassword", "value": "Plumedica@admin123" }
+    { "key": "doctorMongoId", "value": "" }
   ],
   "item": [
-    {
-      "name": "Health",
-      "item": [
-        {
-          "name": "Server Health Check",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Server is running', () => pm.expect(pm.response.text()).to.include('Backend Running'));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        }
-      ]
-    },
     {
       "name": "Auth",
       "item": [
         {
-          "name": "Register Doctor (form-data)",
+          "name": "Register Doctor",
           "request": {
             "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "Full Name", "value": "Vikram Naidu", "type": "text" },
-                { "key": "Email Address", "value": "vikram.test@example.com", "type": "text" },
-                { "key": "Mobile Number", "value": "9090909090", "type": "text" },
-                { "key": "Password", "value": "vikram@123", "type": "text" },
-                { "key": "Qualification", "value": "MBBS, MD Dermatology", "type": "text" },
-                { "key": "Years of Experience", "value": "8 Years", "type": "text" },
-                { "key": "Clinic Address", "value": "Skin Glow Clinic, Tirupati", "type": "text" },
-                { "key": "Specialization", "value": "Dermatology", "type": "text" },
-                { "key": "Medical License Number", "value": "LIC2212", "type": "text" },
-                { "key": "Availability", "value": "Mon-Sat | 9AM - 5PM", "type": "text" }
-              ]
-            },
-            "url": "{{baseUrl}}/api/auth/register"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (pm.response.code === 201) {",
-                  "  pm.test('Registration successful', () => pm.expect(json.success).to.eql(true));",
-                  "} else if (pm.response.code === 400) {",
-                  "  pm.test('Expected validation/duplicate error', () => pm.expect(json.message).to.be.a('string'));",
-                  "} else {",
-                  "  pm.test('Unexpected status', () => pm.expect.fail('Status: ' + pm.response.code));",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Register Doctor (JSON)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Aarav Sharma\",\n  \"email\": \"newdoctor@example.com\",\n  \"mobile\": \"9876543210\",\n  \"password\": \"aarav@123\",\n  \"qualification\": \"MBBS, MD Cardiology\",\n  \"experience\": \"5 Years\",\n  \"clinicAddress\": \"Apollo Heart Clinic, Hyderabad\",\n  \"specialization\": \"Cardiology\",\n  \"licenseNumber\": \"LIC3301\",\n  \"availability\": \"Mon-Sat | 9AM - 5PM\"\n}"
+              "raw": "{\n  \"fullName\": \"Vikram Naidu\",\n  \"email\": \"newdoctor@example.com\",\n  \"mobile\": \"9090909090\",\n  \"password\": \"vikram@123\",\n  \"qualification\": \"MBBS\",\n  \"experience\": \"5 Years\",\n  \"clinicAddress\": \"Tirupati\",\n  \"specialization\": \"Dermatology\",\n  \"licenseNumber\": \"LIC9901\",\n  \"availability\": \"Mon-Sat\"\n}"
             },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/api/auth/register"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 201 or 400', () => pm.expect([201, 400]).to.include(pm.response.code));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         },
         {
-          "name": "Login Doctor (JSON)",
+          "name": "Login Doctor",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{doctorEmail}}\",\n  \"password\": \"{{doctorPassword}}\"\n}"
+              "raw": "{\n  \"email\": \"srikanthparimisetty93@gmail.com\",\n  \"password\": \"aarav@123\"\n}"
             },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/api/auth/login"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (pm.response.code === 200) {",
-                  "  pm.test('Login successful', () => pm.expect(json.success).to.eql(true));",
-                  "  pm.test('Token received', () => pm.expect(json.token).to.be.a('string'));",
-                  "  pm.collectionVariables.set('authToken', json.token);",
-                  "  if (json.doctor && json.doctor._id) {",
-                  "    pm.collectionVariables.set('doctorMongoId', String(json.doctor._id).trim());",
-                  "  }",
-                  "} else {",
-                  "  pm.test('Login blocked or failed', () => pm.expect([400, 403, 404]).to.include(pm.response.code));",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login Doctor (form-data)",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "Email Address", "value": "{{doctorEmail}}", "type": "text" },
-                { "key": "Password", "value": "{{doctorPassword}}", "type": "text" }
-              ]
-            },
-            "url": "{{baseUrl}}/api/auth/login"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "  const json = pm.response.json();",
-                  "  pm.collectionVariables.set('authToken', json.token);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         }
       ]
     },
@@ -183,123 +50,45 @@
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+              "raw": "{\n  \"email\": \"admin@plumedica.com\",\n  \"password\": \"Plumedica@admin123\"\n}"
             },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/api/admin/login"
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('Admin login successful', () => pm.expect(json.success).to.eql(true));",
-                  "pm.collectionVariables.set('adminToken', json.token);",
-                  "console.log('adminToken saved');"
-                ],
-                "type": "text/javascript"
-              }
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["pm.collectionVariables.set('adminToken', pm.response.json().token);"]
             }
-          ]
+          }]
         },
         {
-          "name": "Get All Doctors",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/doctors"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const doctors = pm.response.json();",
-                  "pm.test('Returns array', () => pm.expect(doctors).to.be.an('array'));",
-                  "const pending = doctors.find(d => d.status === 'PENDING');",
-                  "if (pending) {",
-                  "  pm.collectionVariables.set('doctorMongoId', String(pending._id).trim());",
-                  "  pm.collectionVariables.set('doctorEmail', pending.email);",
-                  "  console.log('Saved pending doctor id:', pending._id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
+          "name": "Get Doctors",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/doctors" },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json().doctors.find(x => x.status === 'PENDING');",
+                "if (d) pm.collectionVariables.set('doctorMongoId', String(d._id).trim());"
+              ]
             }
-          ]
+          }]
         },
         {
           "name": "Approve Doctor",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/approve/{{doctorMongoId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('Approved successfully', () => pm.expect(json.success).to.eql(true));",
-                  "console.log('emailSent:', json.emailSent, 'doctorId:', json.doctorId);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          "request": { "method": "PUT", "url": "{{baseUrl}}/api/admin/approve/{{doctorMongoId}}" }
         },
         {
           "name": "Reject Doctor",
           "request": {
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"rejectionReason\": \"Incomplete documents or invalid license\"\n}"
-            },
+            "body": { "mode": "raw", "raw": "{\n  \"rejectionReason\": \"Incomplete documents\"\n}" },
             "url": "{{baseUrl}}/api/admin/reject/{{doctorMongoId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('Rejected successfully', () => pm.expect(json.success).to.eql(true));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Resend Approval Email",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/resend-approval/{{doctorMongoId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('Email sent', () => pm.expect(json.message).to.include('sent'));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         }
       ]
     }
