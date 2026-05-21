@@ -24,6 +24,9 @@ mongoose
         console.log("MongoDB connected");
         await seedAdmin();
         console.log("Admin ready");
+        sendEmail.init().then((ok) => {
+            console.log(ok ? "[EMAIL] Service ready" : "[EMAIL] Service not verified");
+        });
     })
     .catch((err) => console.error("MongoDB error:", err.message));
 
@@ -37,6 +40,7 @@ app.get("/health", (_, res) => {
         message: "Plumedica API is healthy",
         timestamp: new Date().toISOString(),
         emailConfigured: sendEmail.isConfigured(),
+        emailVerified: sendEmail.isVerified(),
         environment: env.nodeEnv,
     });
 });

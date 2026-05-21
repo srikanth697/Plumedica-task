@@ -54,12 +54,17 @@ exports.approveDoctor = async (req, res) => {
             generatedDoctorId
         );
 
+        const message = email.emailSent
+            ? "Doctor approved successfully"
+            : email.emailQueued
+                ? "Doctor approved successfully. Email is being sent in background."
+                : "Doctor approved successfully but email failed";
+
         return res.status(200).json({
             success: true,
-            message: email.emailSent
-                ? "Doctor approved successfully"
-                : "Doctor approved successfully but email failed",
+            message,
             emailSent: email.emailSent,
+            emailQueued: email.emailQueued || false,
             emailError: email.emailError,
             doctorEmail: doctor.email,
             doctorId: generatedDoctorId,
@@ -95,12 +100,17 @@ exports.rejectDoctor = async (req, res) => {
             rejectionReason.trim()
         );
 
+        const message = email.emailSent
+            ? "Doctor rejected successfully"
+            : email.emailQueued
+                ? "Doctor rejected successfully. Email is being sent in background."
+                : "Doctor rejected successfully but email failed";
+
         return res.status(200).json({
             success: true,
-            message: email.emailSent
-                ? "Doctor rejected successfully"
-                : "Doctor rejected successfully but email failed",
+            message,
             emailSent: email.emailSent,
+            emailQueued: email.emailQueued || false,
             emailError: email.emailError,
             doctorEmail: doctor.email,
         });
