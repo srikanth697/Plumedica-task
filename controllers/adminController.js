@@ -1,5 +1,5 @@
 const Doctor = require("../models/Doctor");
-const sendEmail = require("../utils/sendEmail");
+const sendEmail = require("../utils/sendEmails");
 
 exports.getDoctors = async (req, res) => {
 
@@ -42,11 +42,15 @@ exports.approveDoctor = async (req, res) => {
 
         await doctor.save();
 
-        await sendEmail(
-            doctor.email,
-            "Doctor Approved",
-            `Your account approved successfully. Doctor ID: ${doctorId}`
-        );
+        try {
+            await sendEmail(
+                doctor.email,
+                "Doctor Approved",
+                `Your account approved successfully. Doctor ID: ${doctorId}`
+            );
+        } catch (emailError) {
+            console.error("Approval email failed:", emailError.message);
+        }
 
         res.json({
             success: true,
@@ -84,11 +88,15 @@ exports.rejectDoctor = async (req, res) => {
 
         await doctor.save();
 
-        await sendEmail(
-            doctor.email,
-            "Application Rejected",
-            `Reason: ${rejectionReason}`
-        );
+        try {
+            await sendEmail(
+                doctor.email,
+                "Application Rejected",
+                `Reason: ${rejectionReason}`
+            );
+        } catch (emailError) {
+            console.error("Rejection email failed:", emailError.message);
+        }
 
         res.json({
             success: true,
