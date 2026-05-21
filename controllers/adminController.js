@@ -46,6 +46,8 @@ exports.approveDoctor = async (req, res) => {
         doctor.rejectionReason = undefined;
         await doctor.save();
 
+        console.log(`[APPROVE] Doctor saved: ${doctor.email} | id: ${generatedDoctorId}`);
+
         const email = await sendEmail.approval(
             doctor.email,
             doctor.fullName,
@@ -55,8 +57,8 @@ exports.approveDoctor = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: email.emailSent
-                ? "Doctor approved and email sent"
-                : "Doctor approved but email failed",
+                ? "Doctor approved successfully"
+                : "Doctor approved successfully but email failed",
             emailSent: email.emailSent,
             emailError: email.emailError,
             doctorEmail: doctor.email,
@@ -85,6 +87,8 @@ exports.rejectDoctor = async (req, res) => {
         doctor.doctorId = undefined;
         await doctor.save();
 
+        console.log(`[REJECT] Doctor saved: ${doctor.email}`);
+
         const email = await sendEmail.rejection(
             doctor.email,
             doctor.fullName,
@@ -94,8 +98,8 @@ exports.rejectDoctor = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: email.emailSent
-                ? "Doctor rejected and email sent"
-                : "Doctor rejected but email failed",
+                ? "Doctor rejected successfully"
+                : "Doctor rejected successfully but email failed",
             emailSent: email.emailSent,
             emailError: email.emailError,
             doctorEmail: doctor.email,

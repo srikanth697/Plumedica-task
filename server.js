@@ -1,4 +1,5 @@
-require("dotenv").config();
+const { env, logEnvStatus, validateRequired } = require("./config/env");
+const sendEmail = require("./utils/sendEmail");
 
 const express = require("express");
 const cors = require("cors");
@@ -8,19 +9,14 @@ const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const seedAdmin = require("./utils/seedAdmin");
 
+logEnvStatus();
+validateRequired();
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-const requiredEnv = ["MONGO_URI", "JWT_SECRET", "RESEND_API_KEY"];
-
-for (const key of requiredEnv) {
-    if (!process.env[key]?.trim()) {
-        console.error(`Missing required env: ${key}`);
-    }
-}
 
 mongoose
     .connect(process.env.MONGO_URI)
@@ -40,6 +36,8 @@ app.get("/health", (_, res) => {
         success: true,
         message: "Plumedica API is healthy",
         timestamp: new Date().toISOString(),
+        emailConfigured: sendEmail.isConfigured(),
+        environment: env.nodeEnv,
     });
 });
 
