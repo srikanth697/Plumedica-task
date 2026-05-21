@@ -21,6 +21,7 @@ exports.registerDoctor = async (req, res) => {
             specialization,
             licenseNumber,
             availability,
+            document,
         } = normalizeRegisterBody(req.body);
 
         if (!fullName || !email || !mobile || !password || !licenseNumber) {
@@ -61,6 +62,7 @@ exports.registerDoctor = async (req, res) => {
             specialization,
             licenseNumber,
             availability,
+            document,
             status: "PENDING",
         });
 

@@ -16,6 +16,12 @@ const REGISTER_FIELDS = {
     "medical license number": "licenseNumber",
     "license number": "licenseNumber",
     availability: "availability",
+    document: "document",
+    "medical document": "document",
+    "upload document": "document",
+    "profile photo": "document",
+    photo: "document",
+    file: "document",
 };
 
 const REGISTER_KEYS = [
@@ -29,6 +35,7 @@ const REGISTER_KEYS = [
     "specialization",
     "licenseNumber",
     "availability",
+    "document",
 ];
 
 const normalizeFields = (body, fieldMap, directKeys) => {
