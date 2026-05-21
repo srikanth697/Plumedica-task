@@ -136,13 +136,19 @@ exports.loginDoctor = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: doctor._id },
-            process.env.JWT_SECRET
+            {
+                id: doctor._id,
+                role: "doctor",
+                email: doctor.email,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
         );
 
         res.json({
             success: true,
             token,
+            role: "doctor",
             doctorId: doctor.doctorId,
             doctor,
         });
