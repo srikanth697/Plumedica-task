@@ -10,6 +10,9 @@ const MAX_RETRIES = 2;
 let transporter = null;
 let verified = false;
 
+const ok = (extra = {}) => ({ success: true, error: null, ...extra });
+const fail = (error, extra = {}) => ({ success: false, error, ...extra });
+
 const withTimeout = (promise, ms, label) =>
     Promise.race([
         promise,
@@ -40,10 +43,26 @@ const createTransporter = () =>
         },
     });
 
-const resetTransporter = () => {
-    if (transporter) {
-        transporter.close().catch(() => {});
+const safeCloseTransporter = () => {
+    if (!transporter) {
+        return;
     }
+
+    try {
+        const closeResult = transporter.close();
+
+        if (closeResult && typeof closeResult.then === "function") {
+            closeResult.catch((err) => {
+                console.warn("[EMAIL] Transporter close warning:", err.message);
+            });
+        }
+    } catch (err) {
+        console.warn("[EMAIL] Transporter close warning:", err.message);
+    }
+};
+
+const resetTransporter = () => {
+    safeCloseTransporter();
     transporter = null;
     verified = false;
 };
@@ -126,7 +145,7 @@ const sendMailWithRetry = async (payload, timeoutMs = SMTP_TIMEOUT_MS) => {
             resetTransporter();
 
             if (attempt < MAX_RETRIES) {
-                await new Promise((r) => setTimeout(r, 2000 * attempt));
+                await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
             }
         }
     }
@@ -134,7 +153,7 @@ const sendMailWithRetry = async (payload, timeoutMs = SMTP_TIMEOUT_MS) => {
     throw lastError;
 };
 
-const sendInBackground = (payload, label) => {
+const runBackgroundSend = (payload, label) => {
     setImmediate(async () => {
         try {
             const result = await sendMailWithRetry(payload, SMTP_TIMEOUT_MS);
@@ -145,86 +164,97 @@ const sendInBackground = (payload, label) => {
     });
 };
 
-const sendEmail = {
-    init: initEmailService,
+/**
+ * Core email sender — always returns a result object (never throws).
+ * @returns {Promise<{success: boolean, error: string|null, messageId?: string, emailQueued?: boolean}>}
+ */
+const sendEmail = async (mailPayload, options = {}) => {
+    const timeoutMs = options.timeoutMs || API_EMAIL_TIMEOUT_MS;
 
-    safe: async (mailPayload, options = {}) => {
-        const timeoutMs = options.timeoutMs || API_EMAIL_TIMEOUT_MS;
-
-        try {
-            if (!env.emailUser || !env.emailPass) {
-                return {
-                    emailSent: false,
-                    emailError: "Gmail credentials not configured on server",
-                    messageId: null,
-                };
-            }
-
-            const result = await sendMailWithRetry(mailPayload, timeoutMs);
-
-            return {
-                emailSent: true,
-                emailError: null,
-                messageId: result.messageId,
-            };
-        } catch (err) {
-            if (options.backgroundRetry) {
-                sendInBackground(mailPayload, options.backgroundRetry);
-            }
-
-            return {
+    try {
+        if (!env.emailUser || !env.emailPass) {
+            console.error("[EMAIL] EMAIL_USER or EMAIL_PASS missing");
+            return fail("Gmail credentials not configured on server", {
                 emailSent: false,
-                emailError: err.message,
                 messageId: null,
-                emailQueued: Boolean(options.backgroundRetry),
-            };
-        }
-    },
-
-    approval: async (to, fullName, doctorId) => {
-        console.log(`[APPROVE EMAIL] Preparing for ${to} | doctorId: ${doctorId}`);
-
-        const template = approvalTemplate(fullName, doctorId);
-        const result = await sendEmail.safe(
-            { to, ...template },
-            { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "approval" }
-        );
-
-        if (result.emailSent) {
-            console.log(`[APPROVE EMAIL] Success for ${to}`);
-        } else {
-            console.error(`[APPROVE EMAIL] Failed for ${to}:`, result.emailError);
-            if (result.emailQueued) {
-                console.log(`[APPROVE EMAIL] Queued background retry for ${to}`);
-            }
+            });
         }
 
-        return result;
-    },
+        const result = await sendMailWithRetry(mailPayload, timeoutMs);
 
-    rejection: async (to, fullName, rejectionReason) => {
-        console.log(`[REJECT EMAIL] Preparing for ${to}`);
+        return ok({
+            emailSent: true,
+            messageId: result.messageId,
+            provider: result.provider,
+        });
+    } catch (err) {
+        console.error("[EMAIL] Send failed:", err.message);
 
-        const template = rejectionTemplate(fullName, rejectionReason);
-        const result = await sendEmail.safe(
-            { to, ...template },
-            { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "rejection" }
-        );
-
-        if (result.emailSent) {
-            console.log(`[REJECT EMAIL] Success for ${to}`);
-        } else {
-            console.error(`[REJECT EMAIL] Failed for ${to}:`, result.emailError);
-            if (result.emailQueued) {
-                console.log(`[REJECT EMAIL] Queued background retry for ${to}`);
-            }
+        if (options.backgroundRetry) {
+            runBackgroundSend(mailPayload, options.backgroundRetry);
         }
 
-        return result;
-    },
-
-    isConfigured: () => Boolean(env.emailUser && env.emailPass),
-    isVerified: () => verified,
+        return fail(err.message, {
+            emailSent: false,
+            messageId: null,
+            emailQueued: Boolean(options.backgroundRetry),
+        });
+    }
 };
+
+sendEmail.init = initEmailService;
+
+sendEmail.approval = async (to, fullName, doctorId) => {
+    console.log(`[APPROVE EMAIL] Preparing for ${to} | doctorId: ${doctorId}`);
+
+    const template = approvalTemplate(fullName, doctorId);
+    const result = await sendEmail(
+        { to, ...template },
+        { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "approval" }
+    );
+
+    if (result.success) {
+        console.log(`[APPROVE EMAIL] Success for ${to}`);
+    } else {
+        console.error(`[APPROVE EMAIL] Failed for ${to}:`, result.error);
+    }
+
+    return {
+        success: result.success,
+        error: result.error,
+        emailSent: result.emailSent ?? result.success,
+        emailError: result.error,
+        messageId: result.messageId ?? null,
+        emailQueued: result.emailQueued ?? false,
+    };
+};
+
+sendEmail.rejection = async (to, fullName, rejectionReason) => {
+    console.log(`[REJECT EMAIL] Preparing for ${to}`);
+
+    const template = rejectionTemplate(fullName, rejectionReason);
+    const result = await sendEmail(
+        { to, ...template },
+        { timeoutMs: API_EMAIL_TIMEOUT_MS, backgroundRetry: "rejection" }
+    );
+
+    if (result.success) {
+        console.log(`[REJECT EMAIL] Success for ${to}`);
+    } else {
+        console.error(`[REJECT EMAIL] Failed for ${to}:`, result.error);
+    }
+
+    return {
+        success: result.success,
+        error: result.error,
+        emailSent: result.emailSent ?? result.success,
+        emailError: result.error,
+        messageId: result.messageId ?? null,
+        emailQueued: result.emailQueued ?? false,
+    };
+};
+
+sendEmail.isConfigured = () => Boolean(env.emailUser && env.emailPass);
+sendEmail.isVerified = () => verified;
 
 module.exports = sendEmail;

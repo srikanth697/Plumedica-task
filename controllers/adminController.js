@@ -20,6 +20,25 @@ const getDoctorOrRespond = async (id, res) => {
     return doctor;
 };
 
+const buildEmailResponse = (actionLabel, emailResult, extra = {}) => {
+    let message = `${actionLabel} successfully`;
+
+    if (!emailResult.success) {
+        message = emailResult.emailQueued
+            ? `${actionLabel} successfully. Email is being sent in background.`
+            : `${actionLabel} successfully but email failed`;
+    }
+
+    return {
+        success: true,
+        message,
+        emailSent: emailResult.success,
+        emailQueued: emailResult.emailQueued || false,
+        emailError: emailResult.error || null,
+        ...extra,
+    };
+};
+
 exports.getDoctors = async (req, res) => {
     try {
         const doctors = await Doctor.find()
@@ -48,27 +67,22 @@ exports.approveDoctor = async (req, res) => {
 
         console.log(`[APPROVE] Doctor saved: ${doctor.email} | id: ${generatedDoctorId}`);
 
-        const email = await sendEmail.approval(
+        const emailResult = await sendEmail.approval(
             doctor.email,
             doctor.fullName,
             generatedDoctorId
         );
 
-        const message = email.emailSent
-            ? "Doctor approved successfully"
-            : email.emailQueued
-                ? "Doctor approved successfully. Email is being sent in background."
-                : "Doctor approved successfully but email failed";
+        if (!emailResult.success) {
+            console.error("[APPROVE] Email failed:", emailResult.error);
+        }
 
-        return res.status(200).json({
-            success: true,
-            message,
-            emailSent: email.emailSent,
-            emailQueued: email.emailQueued || false,
-            emailError: email.emailError,
-            doctorEmail: doctor.email,
-            doctorId: generatedDoctorId,
-        });
+        return res.status(200).json(
+            buildEmailResponse("Doctor approved", emailResult, {
+                doctorEmail: doctor.email,
+                doctorId: generatedDoctorId,
+            })
+        );
     } catch (error) {
         console.error("Approve error:", error);
         return res.status(500).json({ success: false, message: "Failed to approve doctor" });
@@ -94,26 +108,21 @@ exports.rejectDoctor = async (req, res) => {
 
         console.log(`[REJECT] Doctor saved: ${doctor.email}`);
 
-        const email = await sendEmail.rejection(
+        const emailResult = await sendEmail.rejection(
             doctor.email,
             doctor.fullName,
             rejectionReason.trim()
         );
 
-        const message = email.emailSent
-            ? "Doctor rejected successfully"
-            : email.emailQueued
-                ? "Doctor rejected successfully. Email is being sent in background."
-                : "Doctor rejected successfully but email failed";
+        if (!emailResult.success) {
+            console.error("[REJECT] Email failed:", emailResult.error);
+        }
 
-        return res.status(200).json({
-            success: true,
-            message,
-            emailSent: email.emailSent,
-            emailQueued: email.emailQueued || false,
-            emailError: email.emailError,
-            doctorEmail: doctor.email,
-        });
+        return res.status(200).json(
+            buildEmailResponse("Doctor rejected", emailResult, {
+                doctorEmail: doctor.email,
+            })
+        );
     } catch (error) {
         console.error("Reject error:", error);
         return res.status(500).json({ success: false, message: "Failed to reject doctor" });

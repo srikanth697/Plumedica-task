@@ -24,9 +24,12 @@ mongoose
         console.log("MongoDB connected");
         await seedAdmin();
         console.log("Admin ready");
-        sendEmail.init().then((ok) => {
-            console.log(ok ? "[EMAIL] Service ready" : "[EMAIL] Service not verified");
-        });
+        try {
+            const emailReady = await sendEmail.init();
+            console.log(emailReady ? "[EMAIL] Service ready" : "[EMAIL] Service not verified");
+        } catch (emailErr) {
+            console.error("[EMAIL] Init error:", emailErr.message);
+        }
     })
     .catch((err) => console.error("MongoDB error:", err.message));
 
