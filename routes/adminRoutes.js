@@ -10,6 +10,7 @@ const {
     approveDoctor,
     rejectDoctor,
     resendApprovalEmail,
+    testEmail,
 } = require("../controllers/adminController");
 const { protectAdmin } = require("../middleware/authMiddleware");
 
@@ -35,5 +36,7 @@ router.put("/approve/:id", approveDoctor);
 router.post("/resend-approval/:id", resendApprovalEmail);
 
 router.put("/reject/:id", rejectDoctor);
+
+router.post("/test-email", testEmail);
 
 module.exports = router;

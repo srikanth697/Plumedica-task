@@ -6,6 +6,7 @@ require("dotenv").config();
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { seedAdmin } = require("./utils/seedAdmin");
+const { verifyEmailConnection } = require("./utils/sendEmails");
 
 const app = express();
 
@@ -21,6 +22,15 @@ mongoose.connect(process.env.MONGO_URI)
         console.log("Admin account ready");
     } catch (err) {
         console.error("Admin seed error:", err.message);
+    }
+
+    const emailStatus = await verifyEmailConnection();
+
+    if (emailStatus.ok) {
+        console.log(emailStatus.message);
+    } else {
+        console.error("Email not configured:", emailStatus.message);
+        console.error("Set EMAIL_USER + EMAIL_PASS on Render (or RESEND_API_KEY for production)");
     }
 })
 .catch((err) => {

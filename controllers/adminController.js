@@ -1,5 +1,21 @@
 const Doctor = require("../models/Doctor");
 const sendEmail = require("../utils/sendEmails");
+const {
+    approvalEmail,
+    rejectionEmail,
+} = require("../utils/emailTemplates");
+
+const sendDoctorEmail = async (doctor, templateFn, extraArg) => {
+    const template = templateFn(doctor.fullName, extraArg);
+    const result = await sendEmail.withRetry(
+        doctor.email,
+        template.subject,
+        template.text,
+        template.html
+    );
+
+    return result;
+};
 
 exports.getDoctors = async (req, res) => {
 
@@ -43,22 +59,26 @@ exports.approveDoctor = async (req, res) => {
         await doctor.save();
 
         let emailSent = false;
+        let emailError = null;
+        let messageId = null;
 
         try {
-            await sendEmail(
-                doctor.email,
-                "Plumedica - Doctor Account Approved",
-                `Dear ${doctor.fullName},\n\nYour doctor registration has been approved.\n\nDoctor ID: ${doctorId}\n\nYou can now log in to the Plumedica app.\n\nRegards,\nPlumedica Team`
-            );
+            const result = await sendDoctorEmail(doctor, approvalEmail, doctorId);
             emailSent = true;
-        } catch (emailError) {
-            console.error("Approval email failed:", emailError.message);
+            messageId = result.messageId;
+        } catch (error) {
+            emailError = error.message;
+            console.error("Approval email failed:", emailError);
         }
 
         res.json({
             success: true,
-            message: "Doctor approved successfully",
+            message: emailSent
+                ? "Doctor approved successfully. Email sent."
+                : "Doctor approved but email failed to send.",
             emailSent,
+            emailError,
+            messageId,
             doctorEmail: doctor.email,
             doctorId,
         });
@@ -91,15 +111,13 @@ exports.resendApprovalEmail = async (req, res) => {
             });
         }
 
-        await sendEmail(
-            doctor.email,
-            "Plumedica - Doctor Account Approved",
-            `Dear ${doctor.fullName},\n\nYour doctor registration has been approved.\n\nDoctor ID: ${doctor.doctorId}\n\nYou can now log in to the Plumedica app.\n\nRegards,\nPlumedica Team`
-        );
+        const result = await sendDoctorEmail(doctor, approvalEmail, doctor.doctorId);
 
         res.json({
             success: true,
             message: "Approval email sent successfully",
+            emailSent: true,
+            messageId: result.messageId,
             doctorEmail: doctor.email,
         });
 
@@ -109,6 +127,8 @@ exports.resendApprovalEmail = async (req, res) => {
 
         res.status(500).json({
             message: error.message || "Failed to send approval email",
+            emailSent: false,
+            emailError: error.message,
         });
 
     }
@@ -122,6 +142,12 @@ exports.rejectDoctor = async (req, res) => {
         const { id } = req.params;
 
         const { rejectionReason } = req.body;
+
+        if (!rejectionReason) {
+            return res.status(400).json({
+                message: "rejectionReason is required",
+            });
+        }
 
         const doctor = await Doctor.findById(id);
 
@@ -137,22 +163,30 @@ exports.rejectDoctor = async (req, res) => {
         await doctor.save();
 
         let emailSent = false;
+        let emailError = null;
+        let messageId = null;
 
         try {
-            await sendEmail(
-                doctor.email,
-                "Plumedica - Application Rejected",
-                `Dear ${doctor.fullName},\n\nYour registration was rejected.\n\nReason: ${rejectionReason}\n\nRegards,\nPlumedica Team`
+            const result = await sendDoctorEmail(
+                doctor,
+                rejectionEmail,
+                rejectionReason
             );
             emailSent = true;
-        } catch (emailError) {
-            console.error("Rejection email failed:", emailError.message);
+            messageId = result.messageId;
+        } catch (error) {
+            emailError = error.message;
+            console.error("Rejection email failed:", emailError);
         }
 
         res.json({
             success: true,
-            message: "Doctor rejected successfully",
+            message: emailSent
+                ? "Doctor rejected successfully. Email sent."
+                : "Doctor rejected but email failed to send.",
             emailSent,
+            emailError,
+            messageId,
             doctorEmail: doctor.email,
         });
 
@@ -160,6 +194,40 @@ exports.rejectDoctor = async (req, res) => {
 
         res.status(500).json({
             message: error.message,
+        });
+
+    }
+
+};
+
+exports.testEmail = async (req, res) => {
+
+    try {
+
+        const { to } = req.body;
+        const testTo = to || process.env.EMAIL_USER;
+
+        const result = await sendEmail.withRetry(
+            testTo,
+            "Plumedica - Email Test",
+            "This is a test email from Plumedica backend. If you received this, email is working.",
+            "<p>This is a <strong>test email</strong> from Plumedica backend.</p><p>If you received this, email is working.</p>"
+        );
+
+        res.json({
+            success: true,
+            message: "Test email sent successfully",
+            to: testTo,
+            messageId: result.messageId,
+            provider: result.provider,
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: "Test email failed",
+            emailError: error.message,
         });
 
     }
