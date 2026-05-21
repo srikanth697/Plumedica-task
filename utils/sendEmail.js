@@ -2,9 +2,8 @@ const nodemailer = require("nodemailer");
 const { env } = require("../config/env");
 const { approvalTemplate, rejectionTemplate } = require("./emailTemplates");
 
-const SMTP_HOST = "smtp.gmail.com";
 const API_EMAIL_TIMEOUT_MS = 20000;
-const SMTP_TIMEOUT_MS = 60000;
+const SMTP_TIMEOUT_MS = 45000;
 const MAX_RETRIES = 2;
 
 let transporter = null;
@@ -23,16 +22,17 @@ const withTimeout = (promise, ms, label) =>
 
 const createTransporter = () =>
     nodemailer.createTransport({
-        host: SMTP_HOST,
-        port: 465,
-        secure: true,
+        host: env.emailHost,
+        port: env.emailPort,
+        secure: false,
+        requireTLS: true,
         auth: {
             user: env.emailUser,
             pass: env.emailPass,
         },
         pool: true,
-        maxConnections: 3,
-        maxMessages: 100,
+        maxConnections: 2,
+        maxMessages: 50,
         connectionTimeout: SMTP_TIMEOUT_MS,
         greetingTimeout: SMTP_TIMEOUT_MS,
         socketTimeout: SMTP_TIMEOUT_MS,
@@ -74,7 +74,7 @@ const getTransporter = () => {
 
     if (!transporter) {
         transporter = createTransporter();
-        console.log(`[EMAIL] SMTP pool created (${SMTP_HOST}:465 secure)`);
+        console.log(`[EMAIL] Brevo SMTP pool ready (${env.emailHost}:${env.emailPort})`);
     }
 
     return transporter;
@@ -83,17 +83,17 @@ const getTransporter = () => {
 const verifyConnection = async () => {
     const transport = getTransporter();
 
-    console.log("[EMAIL] Verifying SMTP connection...");
+    console.log("[EMAIL] Verifying Brevo SMTP connection...");
 
-    await withTimeout(transport.verify(), SMTP_TIMEOUT_MS, "SMTP verify");
+    await withTimeout(transport.verify(), SMTP_TIMEOUT_MS, "Brevo SMTP verify");
 
     verified = true;
-    console.log("[EMAIL] SMTP connection verified successfully");
+    console.log("[EMAIL] Brevo SMTP verified successfully");
 };
 
 const initEmailService = async () => {
     if (!env.emailUser || !env.emailPass) {
-        console.error("[EMAIL] Skipping verify — credentials missing");
+        console.error("[EMAIL] Skipping verify — Brevo credentials missing");
         return false;
     }
 
@@ -101,7 +101,7 @@ const initEmailService = async () => {
         await verifyConnection();
         return true;
     } catch (err) {
-        console.error("[EMAIL] SMTP verify failed:", err.message);
+        console.error("[EMAIL] Brevo verify failed:", err.message);
         resetTransporter();
         return false;
     }
@@ -110,27 +110,19 @@ const initEmailService = async () => {
 const sendMailOnce = async ({ to, subject, html, text }) => {
     const transport = getTransporter();
 
-    if (!verified) {
-        try {
-            await verifyConnection();
-        } catch (err) {
-            console.warn("[EMAIL] Pre-send verify failed, attempting send anyway:", err.message);
-        }
-    }
-
-    console.log(`[EMAIL] Sending to: ${to} | subject: ${subject}`);
+    console.log(`[EMAIL] Sending via Brevo to: ${to} | subject: ${subject}`);
 
     const info = await transport.sendMail({
-        from: `"Plumedica" <${env.emailUser}>`,
+        from: env.emailFrom,
         to,
         subject,
         html,
         text,
     });
 
-    console.log("[EMAIL] Sent successfully | messageId:", info.messageId);
+    console.log("[EMAIL] Brevo sent successfully | messageId:", info.messageId);
 
-    return { messageId: info.messageId, provider: "gmail" };
+    return { messageId: info.messageId, provider: "brevo" };
 };
 
 const sendMailWithRetry = async (payload, timeoutMs = SMTP_TIMEOUT_MS) => {
@@ -138,7 +130,7 @@ const sendMailWithRetry = async (payload, timeoutMs = SMTP_TIMEOUT_MS) => {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            return await withTimeout(sendMailOnce(payload), timeoutMs, "Gmail sendMail");
+            return await withTimeout(sendMailOnce(payload), timeoutMs, "Brevo sendMail");
         } catch (err) {
             lastError = err;
             console.error(`[EMAIL] Attempt ${attempt}/${MAX_RETRIES} failed:`, err.message);
@@ -164,17 +156,13 @@ const runBackgroundSend = (payload, label) => {
     });
 };
 
-/**
- * Core email sender — always returns a result object (never throws).
- * @returns {Promise<{success: boolean, error: string|null, messageId?: string, emailQueued?: boolean}>}
- */
 const sendEmail = async (mailPayload, options = {}) => {
     const timeoutMs = options.timeoutMs || API_EMAIL_TIMEOUT_MS;
 
     try {
         if (!env.emailUser || !env.emailPass) {
-            console.error("[EMAIL] EMAIL_USER or EMAIL_PASS missing");
-            return fail("Gmail credentials not configured on server", {
+            console.error("[EMAIL] Brevo EMAIL_USER or EMAIL_PASS missing");
+            return fail("Brevo SMTP credentials not configured on server", {
                 emailSent: false,
                 messageId: null,
             });
@@ -188,7 +176,7 @@ const sendEmail = async (mailPayload, options = {}) => {
             provider: result.provider,
         });
     } catch (err) {
-        console.error("[EMAIL] Send failed:", err.message);
+        console.error("[EMAIL] Brevo send failed:", err.message);
 
         if (options.backgroundRetry) {
             runBackgroundSend(mailPayload, options.backgroundRetry);
