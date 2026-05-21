@@ -1,6 +1,7 @@
 const Doctor = require("../models/Doctor");
 const sendEmail = require("../utils/sendEmail");
 const { parseMongoId } = require("../utils/parseId");
+const { normalizeRejectBody } = require("../utils/normalizeBody");
 
 const getDoctorOrRespond = async (id, res) => {
     const mongoId = parseMongoId(id);
@@ -91,10 +92,13 @@ exports.approveDoctor = async (req, res) => {
 
 exports.rejectDoctor = async (req, res) => {
     try {
-        const { rejectionReason } = req.body;
+        const { rejectionReason } = normalizeRejectBody(req.body);
 
-        if (!rejectionReason?.trim()) {
-            return res.status(400).json({ success: false, message: "rejectionReason is required" });
+        if (!rejectionReason) {
+            return res.status(400).json({
+                success: false,
+                message: "rejectionReason is required in request body",
+            });
         }
 
         const doctor = await getDoctorOrRespond(req.params.id, res);
@@ -102,16 +106,16 @@ exports.rejectDoctor = async (req, res) => {
         if (!doctor) return;
 
         doctor.status = "REJECTED";
-        doctor.rejectionReason = rejectionReason.trim();
+        doctor.rejectionReason = rejectionReason;
         doctor.doctorId = undefined;
         await doctor.save();
 
-        console.log(`[REJECT] Doctor saved: ${doctor.email}`);
+        console.log(`[REJECT] Doctor saved: ${doctor.email} | reason: ${rejectionReason}`);
 
         const emailResult = await sendEmail.rejection(
             doctor.email,
             doctor.fullName,
-            rejectionReason.trim()
+            rejectionReason
         );
 
         if (!emailResult.success) {
@@ -121,10 +125,41 @@ exports.rejectDoctor = async (req, res) => {
         return res.status(200).json(
             buildEmailResponse("Doctor rejected", emailResult, {
                 doctorEmail: doctor.email,
+                rejectionReason,
             })
         );
     } catch (error) {
         console.error("Reject error:", error);
         return res.status(500).json({ success: false, message: "Failed to reject doctor" });
+    }
+};
+
+exports.deleteDoctor = async (req, res) => {
+    try {
+        const mongoId = parseMongoId(req.params.id);
+
+        if (!mongoId) {
+            return res.status(400).json({ success: false, message: "Invalid doctor ID" });
+        }
+
+        const doctor = await Doctor.findById(mongoId);
+
+        if (!doctor) {
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+        }
+
+        await Doctor.findByIdAndDelete(mongoId);
+
+        console.log(`[DELETE] Doctor removed: ${doctor.email} (${mongoId})`);
+
+        return res.status(200).json({
+            success: true,
+            message: "Doctor deleted successfully",
+            deletedId: mongoId,
+            doctorEmail: doctor.email,
+        });
+    } catch (error) {
+        console.error("Delete doctor error:", error);
+        return res.status(500).json({ success: false, message: "Failed to delete doctor" });
     }
 };

@@ -46,3 +46,26 @@ exports.normalizeRegisterBody = (body) => normalize(body, REGISTER_KEYS);
 
 exports.normalizeLoginBody = (body) =>
     normalize(body, ["email", "password"]);
+
+const REJECT_FIELD_MAP = {
+    rejectionreason: "rejectionReason",
+    "rejection reason": "rejectionReason",
+    reason: "rejectionReason",
+    rejectreason: "rejectionReason",
+};
+
+exports.normalizeRejectBody = (body) => {
+    if (!body || typeof body !== "object") {
+        return { rejectionReason: "" };
+    }
+
+    const result = normalize(body, ["rejectionReason"]);
+
+    for (const [key, value] of Object.entries(body)) {
+        if (value == null || String(value).trim() === "") continue;
+        const mapped = REJECT_FIELD_MAP[key.trim().toLowerCase()];
+        if (mapped) result[mapped] = String(value).trim();
+    }
+
+    return result;
+};

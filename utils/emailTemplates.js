@@ -76,8 +76,13 @@ exports.rejectionTemplate = (fullName, rejectionReason) => {
         <p style="margin:0;color:#7f1d1d;font-size:15px;line-height:1.6">${rejectionReason}</p>
       </div>
       <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">
-        If you believe this was a mistake or need assistance, please contact our support team with your registered email.
+        If you believe this was a mistake, you may re-apply with corrected documents or contact our support team.
       </p>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 16px">
+        <p style="margin:0;color:#475569;font-size:14px">
+          <strong>Support:</strong> Reply to this email or contact Plumedica Admin with your registered email address.
+        </p>
+      </div>
       <p style="margin:0;color:#64748b;font-size:13px">We appreciate your interest in Plumedica Healthcare.</p>
     `);
 
