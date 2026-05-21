@@ -129,7 +129,7 @@
                   "  pm.test('Token received', () => pm.expect(json.token).to.be.a('string'));",
                   "  pm.collectionVariables.set('authToken', json.token);",
                   "  if (json.doctor && json.doctor._id) {",
-                  "    pm.collectionVariables.set('doctorMongoId', json.doctor._id);",
+                  "    pm.collectionVariables.set('doctorMongoId', String(json.doctor._id).trim());",
                   "  }",
                   "} else {",
                   "  pm.test('Login blocked or failed', () => pm.expect([400, 403, 404]).to.include(pm.response.code));",
@@ -223,7 +223,7 @@
                   "pm.test('Returns array', () => pm.expect(doctors).to.be.an('array'));",
                   "const pending = doctors.find(d => d.status === 'PENDING');",
                   "if (pending) {",
-                  "  pm.collectionVariables.set('doctorMongoId', pending._id);",
+                  "  pm.collectionVariables.set('doctorMongoId', String(pending._id).trim());",
                   "  pm.collectionVariables.set('doctorEmail', pending.email);",
                   "  console.log('Saved pending doctor id:', pending._id);",
                   "}"

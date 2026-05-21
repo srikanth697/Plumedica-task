@@ -1,9 +1,32 @@
 const Doctor = require("../models/Doctor");
 const sendEmail = require("../utils/sendEmails");
+const { parseDoctorId } = require("../utils/parseDoctorId");
 const {
     approvalEmail,
     rejectionEmail,
 } = require("../utils/emailTemplates");
+
+const findDoctorByParamId = async (id, res) => {
+    const doctorId = parseDoctorId(id);
+
+    if (!doctorId) {
+        res.status(400).json({
+            message: "Invalid doctor ID. Copy _id from GET /api/admin/doctors without extra spaces.",
+        });
+        return null;
+    }
+
+    const doctor = await Doctor.findById(doctorId);
+
+    if (!doctor) {
+        res.status(404).json({
+            message: "Doctor not found",
+        });
+        return null;
+    }
+
+    return doctor;
+};
 
 const sendDoctorEmail = async (doctor, templateFn, extraArg) => {
     const template = templateFn(doctor.fullName, extraArg);
@@ -41,14 +64,10 @@ exports.approveDoctor = async (req, res) => {
 
     try {
 
-        const { id } = req.params;
-
-        const doctor = await Doctor.findById(id);
+        const doctor = await findDoctorByParamId(req.params.id, res);
 
         if (!doctor) {
-            return res.status(404).json({
-                message: "Doctor not found",
-            });
+            return;
         }
 
         const doctorId = "DOC" + Date.now();
@@ -97,12 +116,10 @@ exports.resendApprovalEmail = async (req, res) => {
 
     try {
 
-        const { id } = req.params;
-
-        const doctor = await Doctor.findById(id);
+        const doctor = await findDoctorByParamId(req.params.id, res);
 
         if (!doctor) {
-            return res.status(404).json({ message: "Doctor not found" });
+            return;
         }
 
         if (doctor.status !== "APPROVED") {
@@ -139,8 +156,6 @@ exports.rejectDoctor = async (req, res) => {
 
     try {
 
-        const { id } = req.params;
-
         const { rejectionReason } = req.body;
 
         if (!rejectionReason) {
@@ -149,12 +164,10 @@ exports.rejectDoctor = async (req, res) => {
             });
         }
 
-        const doctor = await Doctor.findById(id);
+        const doctor = await findDoctorByParamId(req.params.id, res);
 
         if (!doctor) {
-            return res.status(404).json({
-                message: "Doctor not found",
-            });
+            return;
         }
 
         doctor.status = "REJECTED";
