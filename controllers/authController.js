@@ -12,11 +12,12 @@ exports.registerDoctor = async (req, res) => {
             mobile,
             password,
             qualification,
-            experience,
+            yearsOfExperience,
             clinicAddress,
             specialization,
             licenseNumber,
             availability,
+            document,
         } = req.body;
 
         const emailExists = await Doctor.findOne({ email });
@@ -45,11 +46,12 @@ exports.registerDoctor = async (req, res) => {
             mobile,
             password: hashedPassword,
             qualification,
-            experience,
+            yearsOfExperience,
             clinicAddress,
             specialization,
             licenseNumber,
             availability,
+            document,
             status: "PENDING",
         });
 
