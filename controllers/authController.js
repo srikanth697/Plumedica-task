@@ -1,6 +1,10 @@
 const Doctor = require("../models/Doctor");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const {
+    normalizeRegisterBody,
+    normalizeLoginBody,
+} = require("../utils/normalizeBody");
 
 exports.registerDoctor = async (req, res) => {
 
@@ -17,7 +21,14 @@ exports.registerDoctor = async (req, res) => {
             specialization,
             licenseNumber,
             availability,
-        } = req.body;
+        } = normalizeRegisterBody(req.body);
+
+        if (!fullName || !email || !mobile || !password || !licenseNumber) {
+            return res.status(400).json({
+                message: "Missing required fields",
+                required: ["fullName", "email", "mobile", "password", "licenseNumber"],
+            });
+        }
 
         const emailExists = await Doctor.findOne({ email });
 
@@ -74,7 +85,13 @@ exports.loginDoctor = async (req, res) => {
 
     try {
 
-        const { email, password } = req.body;
+        const { email, password } = normalizeLoginBody(req.body);
+
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Email and password are required",
+            });
+        }
 
         const doctor = await Doctor.findOne({ email });
 
