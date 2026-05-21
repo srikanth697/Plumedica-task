@@ -1,6 +1,6 @@
 const brevo = require("@getbrevo/brevo");
 const { env } = require("../config/env");
-const { approvalTemplate, rejectionTemplate } = require("./emailTemplates");
+const { approvalTemplate, rejectionTemplate, deletionTemplate } = require("./emailTemplates");
 
 let apiInstance = null;
 
@@ -139,6 +139,48 @@ sendEmail.rejection = async (to, fullName, rejectionReason) => {
 
     if (!result.success) {
         console.error(`[REJECT EMAIL] Failed:`, result.error);
+    }
+
+    return {
+        success: result.success,
+        error: result.error,
+        emailSent: result.success,
+        emailError: result.error,
+        messageId: result.messageId ?? null,
+        emailQueued: result.emailQueued ?? false,
+    };
+};
+
+sendEmail.deletion = async (to, fullName, deletionReason) => {
+    console.log("Delete email started");
+    console.log("Doctor email:", to);
+
+    if (!to?.trim()) {
+        console.error("Delete email failed: recipient email missing");
+        return {
+            success: false,
+            error: "Doctor email is missing",
+            emailSent: false,
+            emailError: "Doctor email is missing",
+            messageId: null,
+            emailQueued: false,
+        };
+    }
+
+    const template = deletionTemplate(fullName, deletionReason);
+    const result = await sendEmail(
+        {
+            to: to.trim(),
+            toName: fullName,
+            ...template,
+        },
+        { backgroundRetry: "deletion" }
+    );
+
+    if (result.success) {
+        console.log("Delete email sent successfully | messageId:", result.messageId);
+    } else {
+        console.log("Delete email failed:", result.error);
     }
 
     return {

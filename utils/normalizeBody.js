@@ -69,3 +69,27 @@ exports.normalizeRejectBody = (body) => {
 
     return result;
 };
+
+const DELETE_FIELD_MAP = {
+    deletionreason: "deletionReason",
+    "deletion reason": "deletionReason",
+    reason: "deletionReason",
+    rejectreason: "deletionReason",
+    rejectionreason: "deletionReason",
+};
+
+exports.normalizeDeleteBody = (body) => {
+    if (!body || typeof body !== "object") {
+        return { deletionReason: "" };
+    }
+
+    const result = normalize(body, ["deletionReason"]);
+
+    for (const [key, value] of Object.entries(body)) {
+        if (value == null || String(value).trim() === "") continue;
+        const mapped = DELETE_FIELD_MAP[key.trim().toLowerCase()];
+        if (mapped) result[mapped] = String(value).trim();
+    }
+
+    return result;
+};

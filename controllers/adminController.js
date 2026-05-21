@@ -1,7 +1,7 @@
 const Doctor = require("../models/Doctor");
 const sendEmail = require("../utils/sendEmail");
 const { parseMongoId } = require("../utils/parseId");
-const { normalizeRejectBody } = require("../utils/normalizeBody");
+const { normalizeRejectBody, normalizeDeleteBody } = require("../utils/normalizeBody");
 
 const getDoctorOrRespond = async (id, res) => {
     const mongoId = parseMongoId(id);
@@ -136,6 +136,21 @@ exports.rejectDoctor = async (req, res) => {
 
 exports.deleteDoctor = async (req, res) => {
     try {
+        const { deletionReason: bodyReason } = normalizeDeleteBody(req.body);
+        const deletionReason = (
+            bodyReason ||
+            req.query?.deletionReason ||
+            req.query?.reason ||
+            ""
+        ).trim();
+
+        if (!deletionReason) {
+            return res.status(400).json({
+                success: false,
+                message: "deletionReason is required (JSON body or ?deletionReason= query)",
+            });
+        }
+
         const mongoId = parseMongoId(req.params.id);
 
         if (!mongoId) {
@@ -148,15 +163,37 @@ exports.deleteDoctor = async (req, res) => {
             return res.status(404).json({ success: false, message: "Doctor not found" });
         }
 
+        const doctorEmail = doctor.email;
+        const doctorName = doctor.fullName;
+
+        console.log("Delete email started");
+        console.log("Doctor email:", doctorEmail);
+
+        const emailResult = await sendEmail.deletion(
+            doctorEmail,
+            doctorName,
+            deletionReason
+        );
+
+        if (!emailResult.success) {
+            console.log("Delete email failed:", emailResult.error);
+        } else {
+            console.log("Delete email sent successfully");
+        }
+
         await Doctor.findByIdAndDelete(mongoId);
 
-        console.log(`[DELETE] Doctor removed: ${doctor.email} (${mongoId})`);
+        console.log(`[DELETE] Doctor removed: ${doctorEmail} (${mongoId})`);
 
         return res.status(200).json({
             success: true,
             message: "Doctor deleted successfully",
+            emailSent: Boolean(emailResult.success),
+            emailQueued: Boolean(emailResult.emailQueued),
+            emailError: emailResult.error || null,
             deletedId: mongoId,
-            doctorEmail: doctor.email,
+            doctorEmail,
+            deletionReason,
         });
     } catch (error) {
         console.error("Delete doctor error:", error);

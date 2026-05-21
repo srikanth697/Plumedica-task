@@ -33,6 +33,6 @@ router.get("/doctors", getDoctors);
 router.put("/approve/:id", approveDoctor);
 router.put("/reject/:id", rejectDoctor);
 router.post("/reject/:id", rejectDoctor);
-router.delete("/delete/:id", deleteDoctor);
+router.delete("/delete/:id", parseFormData, deleteDoctor);
 
 module.exports = router;

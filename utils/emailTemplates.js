@@ -88,3 +88,28 @@ exports.rejectionTemplate = (fullName, rejectionReason) => {
 
     return { subject, text, html };
 };
+
+exports.deletionTemplate = (fullName, deletionReason) => {
+    const subject = "Plumedica — Account Removed";
+    const text = `Dear ${fullName},\n\nYour Plumedica doctor account has been removed from our system.\n\nReason: ${deletionReason}\n\nFor support, contact Plumedica admin.\n\nRegards,\nPlumedica Team`;
+
+    const html = baseLayout(`
+      <h2 style="margin:0 0 16px;color:#dc2626;font-size:22px">Account Removed</h2>
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">Dear <strong>${fullName}</strong>,</p>
+      <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6">
+        Your doctor account has been <strong>removed</strong> from the Plumedica Healthcare platform by our admin team.
+      </p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:20px;margin:0 0 24px">
+        <p style="margin:0 0 8px;color:#991b1b;font-size:13px;text-transform:uppercase;letter-spacing:1px">Reason</p>
+        <p style="margin:0;color:#7f1d1d;font-size:15px;line-height:1.6">${deletionReason}</p>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 16px">
+        <p style="margin:0;color:#475569;font-size:14px">
+          <strong>Support:</strong> Contact Plumedica Admin with your registered email if you have questions.
+        </p>
+      </div>
+      <p style="margin:0;color:#64748b;font-size:13px">Thank you for your understanding.</p>
+    `);
+
+    return { subject, text, html };
+};
