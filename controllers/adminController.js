@@ -28,16 +28,26 @@ const findDoctorByParamId = async (id, res) => {
     return doctor;
 };
 
-const sendDoctorEmail = async (doctor, templateFn, extraArg) => {
+const trySendEmailSync = async (doctor, templateFn, extraArg) => {
     const template = templateFn(doctor.fullName, extraArg);
-    const result = await sendEmail.withRetry(
+
+    return sendEmail.safe(
         doctor.email,
         template.subject,
         template.text,
         template.html
     );
+};
 
-    return result;
+const queueDoctorEmail = (doctor, templateFn, extraArg) => {
+    const template = templateFn(doctor.fullName, extraArg);
+
+    sendEmail.sendInBackground(
+        doctor.email,
+        template.subject,
+        template.text,
+        template.html
+    );
 };
 
 exports.getDoctors = async (req, res) => {
@@ -51,6 +61,8 @@ exports.getDoctors = async (req, res) => {
         res.json(doctors);
 
     } catch (error) {
+
+        console.error("Get doctors error:", error);
 
         res.status(500).json({
             message: error.message,
@@ -77,35 +89,30 @@ exports.approveDoctor = async (req, res) => {
 
         await doctor.save();
 
-        let emailSent = false;
-        let emailError = null;
-        let messageId = null;
+        const emailResult = await trySendEmailSync(doctor, approvalEmail, doctorId);
 
-        try {
-            const result = await sendDoctorEmail(doctor, approvalEmail, doctorId);
-            emailSent = true;
-            messageId = result.messageId;
-        } catch (error) {
-            emailError = error.message;
-            console.error("Approval email failed:", emailError);
+        if (!emailResult.emailSent) {
+            queueDoctorEmail(doctor, approvalEmail, doctorId);
         }
 
         res.json({
             success: true,
-            message: emailSent
+            message: emailResult.emailSent
                 ? "Doctor approved successfully. Email sent."
-                : "Doctor approved but email failed to send.",
-            emailSent,
-            emailError,
-            messageId,
+                : "Doctor approved successfully. Email will be retried in background.",
+            emailSent: emailResult.emailSent,
+            emailError: emailResult.emailError,
+            messageId: emailResult.messageId,
             doctorEmail: doctor.email,
             doctorId,
         });
 
     } catch (error) {
 
+        console.error("Approve doctor error:", error);
+
         res.status(500).json({
-            message: error.message,
+            message: error.message || "Failed to approve doctor",
         });
 
     }
@@ -128,19 +135,33 @@ exports.resendApprovalEmail = async (req, res) => {
             });
         }
 
-        const result = await sendDoctorEmail(doctor, approvalEmail, doctor.doctorId);
+        const emailResult = await trySendEmailSync(
+            doctor,
+            approvalEmail,
+            doctor.doctorId
+        );
+
+        if (!emailResult.emailSent) {
+            return res.status(200).json({
+                success: false,
+                message: "Failed to send approval email",
+                emailSent: false,
+                emailError: emailResult.emailError,
+                doctorEmail: doctor.email,
+            });
+        }
 
         res.json({
             success: true,
             message: "Approval email sent successfully",
             emailSent: true,
-            messageId: result.messageId,
+            messageId: emailResult.messageId,
             doctorEmail: doctor.email,
         });
 
     } catch (error) {
 
-        console.error("Resend approval email failed:", error.message);
+        console.error("Resend approval email error:", error);
 
         res.status(500).json({
             message: error.message || "Failed to send approval email",
@@ -175,38 +196,33 @@ exports.rejectDoctor = async (req, res) => {
 
         await doctor.save();
 
-        let emailSent = false;
-        let emailError = null;
-        let messageId = null;
+        const emailResult = await trySendEmailSync(
+            doctor,
+            rejectionEmail,
+            rejectionReason
+        );
 
-        try {
-            const result = await sendDoctorEmail(
-                doctor,
-                rejectionEmail,
-                rejectionReason
-            );
-            emailSent = true;
-            messageId = result.messageId;
-        } catch (error) {
-            emailError = error.message;
-            console.error("Rejection email failed:", emailError);
+        if (!emailResult.emailSent) {
+            queueDoctorEmail(doctor, rejectionEmail, rejectionReason);
         }
 
         res.json({
             success: true,
-            message: emailSent
+            message: emailResult.emailSent
                 ? "Doctor rejected successfully. Email sent."
-                : "Doctor rejected but email failed to send.",
-            emailSent,
-            emailError,
-            messageId,
+                : "Doctor rejected successfully. Email will be retried in background.",
+            emailSent: emailResult.emailSent,
+            emailError: emailResult.emailError,
+            messageId: emailResult.messageId,
             doctorEmail: doctor.email,
         });
 
     } catch (error) {
 
+        console.error("Reject doctor error:", error);
+
         res.status(500).json({
-            message: error.message,
+            message: error.message || "Failed to reject doctor",
         });
 
     }
@@ -220,22 +236,34 @@ exports.testEmail = async (req, res) => {
         const { to } = req.body;
         const testTo = to || process.env.EMAIL_USER;
 
-        const result = await sendEmail.withRetry(
+        const emailResult = await sendEmail.safe(
             testTo,
             "Plumedica - Email Test",
             "This is a test email from Plumedica backend. If you received this, email is working.",
             "<p>This is a <strong>test email</strong> from Plumedica backend.</p><p>If you received this, email is working.</p>"
         );
 
+        if (!emailResult.emailSent) {
+            return res.status(200).json({
+                success: false,
+                message: "Test email failed",
+                emailSent: false,
+                emailError: emailResult.emailError,
+            });
+        }
+
         res.json({
             success: true,
             message: "Test email sent successfully",
             to: testTo,
-            messageId: result.messageId,
-            provider: result.provider,
+            emailSent: true,
+            messageId: emailResult.messageId,
+            provider: emailResult.provider,
         });
 
     } catch (error) {
+
+        console.error("Test email error:", error);
 
         res.status(500).json({
             success: false,

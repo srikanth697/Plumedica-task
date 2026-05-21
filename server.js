@@ -24,14 +24,16 @@ mongoose.connect(process.env.MONGO_URI)
         console.error("Admin seed error:", err.message);
     }
 
-    const emailStatus = await verifyEmailConnection();
-
-    if (emailStatus.ok) {
-        console.log(emailStatus.message);
-    } else {
-        console.error("Email not configured:", emailStatus.message);
-        console.error("Set EMAIL_USER + EMAIL_PASS on Render (or RESEND_API_KEY for production)");
-    }
+    verifyEmailConnection()
+        .then((emailStatus) => {
+            if (emailStatus.ok) {
+                console.log(emailStatus.message);
+            } else {
+                console.error("Email warning:", emailStatus.message);
+                console.error("Set EMAIL_USER + EMAIL_PASS on Render (or RESEND_API_KEY)");
+            }
+        })
+        .catch((err) => console.error("Email verify error:", err.message));
 })
 .catch((err) => {
     console.log("Mongo Error:", err);
@@ -60,6 +62,14 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({
         message: err.message || "Internal server error",
     });
+});
+
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+    console.error("Uncaught exception:", error);
 });
 
 const PORT = process.env.PORT || 5000;
