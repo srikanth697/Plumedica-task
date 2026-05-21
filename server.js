@@ -5,6 +5,7 @@ require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const { seedAdmin } = require("./utils/seedAdmin");
 
 const app = express();
 
@@ -13,8 +14,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 mongoose.connect(process.env.MONGO_URI)
-.then(() => {
+.then(async () => {
     console.log("MongoDB Connected Successfully");
+    try {
+        await seedAdmin();
+        console.log("Admin account ready");
+    } catch (err) {
+        console.error("Admin seed error:", err.message);
+    }
 })
 .catch((err) => {
     console.log("Mongo Error:", err);
