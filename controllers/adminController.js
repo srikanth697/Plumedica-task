@@ -73,6 +73,48 @@ exports.approveDoctor = async (req, res) => {
 
 };
 
+exports.resendApprovalEmail = async (req, res) => {
+
+    try {
+
+        const { id } = req.params;
+
+        const doctor = await Doctor.findById(id);
+
+        if (!doctor) {
+            return res.status(404).json({ message: "Doctor not found" });
+        }
+
+        if (doctor.status !== "APPROVED") {
+            return res.status(400).json({
+                message: "Doctor must be approved before sending approval email",
+            });
+        }
+
+        await sendEmail(
+            doctor.email,
+            "Plumedica - Doctor Account Approved",
+            `Dear ${doctor.fullName},\n\nYour doctor registration has been approved.\n\nDoctor ID: ${doctor.doctorId}\n\nYou can now log in to the Plumedica app.\n\nRegards,\nPlumedica Team`
+        );
+
+        res.json({
+            success: true,
+            message: "Approval email sent successfully",
+            doctorEmail: doctor.email,
+        });
+
+    } catch (error) {
+
+        console.error("Resend approval email failed:", error.message);
+
+        res.status(500).json({
+            message: error.message || "Failed to send approval email",
+        });
+
+    }
+
+};
+
 exports.rejectDoctor = async (req, res) => {
 
     try {
