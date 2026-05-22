@@ -5,6 +5,7 @@ const { normalizeRegisterBody, normalizeLoginBody } = require("../utils/normaliz
 const { validateRegisterInput, sanitizeString } = require("../utils/validators");
 const { parseRegistrationFiles } = require("../utils/parseFiles");
 const { sendSuccess, sendError } = require("../utils/apiResponse");
+const { removeDoctorCompletely } = require("../utils/doctorCleanup");
 
 const toPublicDoctor = (doctor) => ({
     _id: doctor._id,
@@ -35,46 +36,44 @@ exports.register = async (req, res) => {
             return sendError(res, 400, validation.errors.join(", "));
         }
 
-        const {
-            fullName,
-            email,
-            mobile,
-            password,
-            licenseNumber,
-        } = validation.normalized;
+        const normalized = validation.normalized;
 
-        const {
-            qualification,
-            experience,
-            clinicAddress,
-            specialization,
-            availability,
-        } = body;
+        const existingEmail = await Doctor.findOne({ email: normalized.email });
 
-        if (await Doctor.findOne({ email })) {
-            return sendError(res, 400, "Email already exists");
+        if (existingEmail) {
+            if (existingEmail.isDeleted) {
+                await removeDoctorCompletely(existingEmail);
+            } else {
+                return sendError(res, 400, "Email already exists");
+            }
         }
 
-        if (await Doctor.findOne({ licenseNumber })) {
+        const existingLicense = await Doctor.findOne({
+            licenseNumber: normalized.licenseNumber,
+            isDeleted: { $ne: true },
+        });
+
+        if (existingLicense) {
             return sendError(res, 400, "License number already exists");
         }
 
         const { profilePhoto, documents } = parseRegistrationFiles(req.files);
 
         const doctor = await Doctor.create({
-            fullName,
-            email,
-            mobile: mobile.replace(/\D/g, "").slice(-10),
-            password: await bcrypt.hash(password, 10),
-            qualification: sanitizeString(qualification),
-            experience: sanitizeString(experience),
-            clinicAddress: sanitizeString(clinicAddress),
-            specialization: sanitizeString(specialization),
-            licenseNumber,
-            availability: sanitizeString(availability),
+            fullName: normalized.fullName,
+            email: normalized.email,
+            mobile: normalized.mobile,
+            password: await bcrypt.hash(normalized.password, 10),
+            qualification: normalized.qualification,
+            experience: normalized.experience,
+            clinicAddress: normalized.clinicAddress,
+            specialization: normalized.specialization,
+            licenseNumber: normalized.licenseNumber,
+            availability: normalized.availability,
             profilePhoto,
             documents,
             status: "PENDING",
+            isDeleted: false,
         });
 
         return res.status(201).json({
@@ -103,7 +102,10 @@ exports.login = async (req, res) => {
             return sendError(res, 400, "Email and password are required");
         }
 
-        const doctor = await Doctor.findOne({ email: normalizedEmail });
+        const doctor = await Doctor.findOne({
+            email: normalizedEmail,
+            isDeleted: { $ne: true },
+        });
 
         if (!doctor) {
             return sendError(res, 404, "Doctor not found");
@@ -172,7 +174,10 @@ exports.checkStatus = async (req, res) => {
             return sendError(res, 400, "Email is required");
         }
 
-        const doctor = await Doctor.findOne({ email }).select("-password");
+        const doctor = await Doctor.findOne({
+            email,
+            isDeleted: { $ne: true },
+        }).select("-password");
 
         if (!doctor) {
             return sendError(res, 404, "Doctor not found");
@@ -219,7 +224,10 @@ exports.checkStatus = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
     try {
-        const doctor = await Doctor.findById(req.user.id).select("-password");
+        const doctor = await Doctor.findOne({
+            _id: req.user.id,
+            isDeleted: { $ne: true },
+        }).select("-password");
 
         if (!doctor) {
             return sendError(res, 404, "Doctor not found");

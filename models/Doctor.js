@@ -21,8 +21,14 @@ const doctorSchema = new mongoose.Schema(
             enum: ["PENDING", "APPROVED", "REJECTED"],
             default: "PENDING",
         },
+        isDeleted: { type: Boolean, default: false, index: true },
+        deletedAt: { type: Date },
+        deletedReason: { type: String, trim: true },
     },
     { timestamps: true }
 );
+
+doctorSchema.index({ email: 1, isDeleted: 1 });
+doctorSchema.index({ licenseNumber: 1, isDeleted: 1 });
 
 module.exports = mongoose.model("Doctor", doctorSchema);

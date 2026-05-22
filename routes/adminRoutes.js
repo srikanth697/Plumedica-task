@@ -8,6 +8,7 @@ const {
     approveDoctor,
     rejectDoctor,
     deleteDoctor,
+    cleanupInvalidDoctors,
 } = require("../controllers/adminController");
 const { protectAdmin } = require("../middleware/auth");
 const { parseFormData } = require("../middleware/upload");
@@ -31,10 +32,12 @@ router.get("/", (_, res) => {
             "PUT    /api/admin/reject/:id",
             "POST   /api/admin/reject/:id",
             "DELETE /api/admin/delete/:id",
+            "POST   /api/admin/doctors/cleanup-invalid",
         ],
     });
 });
 
+router.post("/doctors/cleanup-invalid", cleanupInvalidDoctors);
 router.get("/doctors/pending", getPendingDoctors);
 router.get("/doctors/approved", getApprovedDoctors);
 router.get("/doctors/rejected", getRejectedDoctors);

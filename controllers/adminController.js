@@ -3,6 +3,8 @@ const sendEmail = require("../utils/sendEmail");
 const { parseMongoId } = require("../utils/parseId");
 const { normalizeRejectBody, normalizeDeleteBody } = require("../utils/normalizeBody");
 const { fetchDoctorList } = require("../utils/doctorList");
+const { deleteDoctorFiles } = require("../utils/fileCleanup");
+const { cleanupInvalidDoctors } = require("../utils/doctorCleanup");
 
 const getDoctorOrRespond = async (id, res) => {
     const mongoId = parseMongoId(id);
@@ -12,7 +14,7 @@ const getDoctorOrRespond = async (id, res) => {
         return null;
     }
 
-    const doctor = await Doctor.findById(mongoId);
+    const doctor = await Doctor.findOne({ _id: mongoId, isDeleted: { $ne: true } });
 
     if (!doctor) {
         res.status(404).json({ success: false, message: "Doctor not found" });
@@ -164,7 +166,7 @@ exports.deleteDoctor = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid doctor ID" });
         }
 
-        const doctor = await Doctor.findById(mongoId);
+        const doctor = await Doctor.findOne({ _id: mongoId, isDeleted: { $ne: true } });
 
         if (!doctor) {
             return res.status(404).json({ success: false, message: "Doctor not found" });
@@ -188,9 +190,19 @@ exports.deleteDoctor = async (req, res) => {
             console.log("Delete email sent successfully");
         }
 
-        await Doctor.findByIdAndDelete(mongoId);
+        const fileCleanup = deleteDoctorFiles(doctor);
 
-        console.log(`[DELETE] Doctor removed: ${doctorEmail} (${mongoId})`);
+        await Doctor.findByIdAndUpdate(mongoId, {
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedReason: deletionReason,
+            profilePhoto: null,
+            documents: [],
+            rejectionReason: undefined,
+            doctorId: undefined,
+        });
+
+        console.log(`[DELETE] Doctor soft-deleted: ${doctorEmail} (${mongoId}) | files: ${fileCleanup.deleted}/${fileCleanup.attempted}`);
 
         return res.status(200).json({
             success: true,
@@ -201,9 +213,27 @@ exports.deleteDoctor = async (req, res) => {
             deletedId: mongoId,
             doctorEmail,
             deletionReason,
+            filesRemoved: fileCleanup.deleted,
         });
     } catch (error) {
         console.error("Delete doctor error:", error);
         return res.status(500).json({ success: false, message: "Failed to delete doctor" });
+    }
+};
+
+exports.cleanupInvalidDoctors = async (req, res) => {
+    try {
+        const result = await cleanupInvalidDoctors();
+
+        return res.status(200).json({
+            success: true,
+            message: "Invalid and dummy doctor records cleaned up",
+            removed: result.removed,
+            scanned: result.scanned,
+            details: result.results,
+        });
+    } catch (error) {
+        console.error("Cleanup invalid doctors error:", error);
+        return res.status(500).json({ success: false, message: "Failed to cleanup invalid doctors" });
     }
 };

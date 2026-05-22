@@ -1,4 +1,5 @@
 const Doctor = require("../models/Doctor");
+const { buildActiveDoctorFilter } = require("./doctorQuality");
 
 const VALID_STATUSES = ["PENDING", "APPROVED", "REJECTED"];
 const DEFAULT_LIMIT = 10;
@@ -28,7 +29,7 @@ const parseListQuery = (query = {}, fixedStatus = null) => {
 };
 
 const buildDoctorFilter = ({ status, search }) => {
-    const filter = {};
+    const filter = buildActiveDoctorFilter();
 
     if (status && VALID_STATUSES.includes(status)) {
         filter.status = status;
@@ -36,11 +37,17 @@ const buildDoctorFilter = ({ status, search }) => {
 
     if (search) {
         const regex = new RegExp(escapeRegex(search), "i");
-        filter.$or = [
-            { fullName: regex },
-            { email: regex },
-            { specialization: regex },
-            { doctorId: regex },
+        filter.$and = [
+            ...(filter.$and || []),
+            {
+                $or: [
+                    { fullName: regex },
+                    { email: regex },
+                    { specialization: regex },
+                    { doctorId: regex },
+                    { licenseNumber: regex },
+                ],
+            },
         ];
     }
 
