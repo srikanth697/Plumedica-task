@@ -29,33 +29,39 @@ const baseLayout = (content) => `
 
 exports.approvalTemplate = (fullName, doctorId) => {
     const subject = "Plumedica — Your Doctor Account is Approved";
-    const text = `Dear ${fullName},\n\nYour Plumedica registration is approved.\n\nDoctor ID: ${doctorId}\n\nLogin: ${LOGIN_URL}\n\nRegards,\nPlumedica Team`;
+    const text = `Dear ${fullName},\n\nYour Plumedica registration has been approved.\n\nDoctor ID: ${doctorId}\n\nLogin: ${LOGIN_URL}\n\nFor support, contact Plumedica Admin.\n\nRegards,\nPlumedica Team`;
 
     const html = baseLayout(`
       <h2 style="margin:0 0 16px;color:#16a34a;font-size:22px">Account Approved</h2>
       <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">Dear <strong>${fullName}</strong>,</p>
       <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6">
-        Congratulations! Your doctor registration has been <strong style="color:#16a34a">approved</strong> by our admin team.
+        Congratulations! Your doctor registration has been <strong style="color:#16a34a">approved</strong> by our admin team. You may now access the Plumedica Healthcare doctor portal.
       </p>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px;text-align:center">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px">
         <p style="margin:0 0 8px;color:#166534;font-size:13px;text-transform:uppercase;letter-spacing:1px">Your Doctor ID</p>
-        <p style="margin:0;font-size:24px;font-weight:bold;color:#0d9488">${doctorId}</p>
+        <p style="margin:0;color:#14532d;font-size:15px;line-height:1.6;font-weight:bold">${doctorId}</p>
       </div>
-      <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6">
-        You can now log in to the Plumedica doctor portal using your registered email and password.
+      <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6">
+        Please log in using your registered email and password to access your dashboard and manage your profile.
       </p>
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
+      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px">
         <tr>
           <td style="background:#0d9488;border-radius:8px">
-            <a href="${LOGIN_URL}" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold">
+            <a href="${LOGIN_URL}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">
               Login to Plumedica
             </a>
           </td>
         </tr>
       </table>
-      <p style="margin:0;color:#64748b;font-size:13px;text-align:center">
-        Or visit: <a href="${LOGIN_URL}" style="color:#0d9488">${LOGIN_URL}</a>
-      </p>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 16px">
+        <p style="margin:0;color:#475569;font-size:14px">
+          <strong>Portal:</strong> <a href="${LOGIN_URL}" style="color:#0d9488;text-decoration:none">${LOGIN_URL}</a>
+        </p>
+        <p style="margin:8px 0 0;color:#475569;font-size:14px">
+          <strong>Support:</strong> Contact Plumedica Admin with your registered email if you need help signing in.
+        </p>
+      </div>
+      <p style="margin:0;color:#64748b;font-size:13px">Welcome to Plumedica Healthcare.</p>
     `);
 
     return { subject, text, html };
